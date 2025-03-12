@@ -1,0 +1,555 @@
+#install.packages("dplyr")
+#install.packages("tidyverse")
+#install.packages("readxl")
+#install.packages("ggplot2")
+#install.packages("janitor")
+library("dplyr")
+library("tidyverse")
+library("readxl")
+library("ggplot2")
+library("janitor")
+setwd("C:\\Users\\casqu\\Documentos Carol\\Internato Médico\\Internato Específico\\Estágio de Investigação\\Análise Dados_R")
+dados <- read.csv("Consulta_P120_CG_recodificação.csv", header = TRUE, sep = ";")
+poll_walk <- read_excel("tabela poluição e walkability - epiporto.xlsx")
+
+str(dados)
+summary(dados)
+
+#Contar mismatches NASC e NASC_a60
+sum(dados$NASC != dados$NASC_a60, na.rm = TRUE)
+
+#união dados < e > de 60 anos
+dados_tidades <- dados %>%
+  rename(ID = ï..ID1) %>%
+  unite("trabalho", trabalho_u60, trabalho_a60, na.rm = TRUE, remove = FALSE) %>%
+  unite("trabalho_outro", trabalho_outro_u60, trabalho_outro_a60, na.rm = TRUE, remove = FALSE) %>%
+  unite("profissao", profissao_u60, profissao_a60, na.rm = TRUE, remove = FALSE) %>%
+  unite("profissao_desempregado", profissao_desempregado_u60, profissao_desempregado_a60, na.rm = TRUE, remove = FALSE) %>%
+  unite("profissao_reforma", profissao_reforma_u60, profissao_reforma_a60, na.rm = TRUE, remove = FALSE) %>%
+  unite("profissao_incap", profissao_incap_u60, profissao_incap_a60, na.rm = TRUE, remove = FALSE) %>%
+  unite("trabalho_vida", trabalho_vida_u60, trabalho_vida_a60, na.rm = TRUE, remove = FALSE) %>%
+  unite("sit_profissao", sit_profissao_u60, sit_profissao_a60, na.rm = TRUE, remove = FALSE) %>%
+  unite("sit_profissao_outro", sit_profissao_outro_u60, sit_profissao_outro_a60, na.rm = TRUE, remove = FALSE) %>%
+  unite("sit_u_profissao", sit_u_profissao_u60, sit_u_profissao_a60, na.rm = TRUE, remove = FALSE) %>%
+  unite("sit_u_profissao_outro", sit_u_profissao_outro_u60, sit_u_profissao_outro_a60, na.rm = TRUE, remove = FALSE) %>%
+  unite("rendimento", rendimento_u60, rendimento_a60, na.rm = TRUE, remove = FALSE) %>%
+  unite("rendimento_cartao", rendimento_cartao_u60, rendimento_cartao_a60, na.rm = TRUE, remove = FALSE) %>%
+  select(- trabalho_u60, - trabalho_a60, -trabalho_outro_u60, -trabalho_outro_u60, -profissao_u60, -profissao_a60, -profissao_desempregado_u60, -profissao_desempregado_a60, -profissao_reforma_u60, -profissao_reforma_a60, -profissao_incap_u60, -profissao_incap_a60, -trabalho_vida_u60, -trabalho_vida_a60, -sit_profissao_u60, - sit_profissao_outro_u60, - sit_profissao_outro_a60, -sit_profissao_u60, -sit_profissao_a60, -sit_u_profissao_u60, -sit_u_profissao_a60, -sit_u_profissao_outro_u60, -sit_u_profissao_outro_a60, -rendimento_u60, -rendimento_a60, -rendimento_cartao_u60, -rendimento_cartao_a60) %>%
+  select(-any_of(contains("P79"))) %>%
+  select(-any_of(contains("G8Q"))) %>%
+  select(-ID1A, -ID1A.1, -inq, -NASC_a60, -idade_reforma_u60, -idade_incap_u60, -profissao_domestico_u60, -idade_a60, -CIVIL_a60, -trabalho_outro_a60, -profissao_domestico_a60, -profissao_princip_desempregado_a60, -profissao_princip_reforma_a60, -profissao_princip_incap_a60, -profissao_princip_domestico_a60)
+
+#n inicial = 2485
+sum(!is.na(dados_tidades$ID))
+
+#Missings ESCOL_b
+sum(is.na(dados_tidades$ESCOL_b))
+
+#Missings ESCOL_a60
+sum(is.na(dados_tidades$ESCOL_a60))
+
+#Mismatches ESCOL_b e ESCOL_2
+sum(dados_tidades$ESCOL_b != dados_tidades$ESCOL_2, na.rm = TRUE)
+sum((dados_tidades$ESCOL_b - dados_tidades$ESCOL_2) > 0, na.rm = TRUE)
+
+#Manter valor mais elevado entre ESCOL_b com ESCOL_2
+dados_tidades$ESCOL <- pmax(dados_tidades$ESCOL_b, dados_tidades$ESCOL_2)
+dados_tidades <- dados_tidades %>%
+  select(- ESCOL_b, - ESCOL_2, -ESCOL_a60, -ESCOL_outro_a60)%>%
+  mutate(ESCOL = na_if(ESCOL, 99))
+unique(dados_tidades$ESCOL)
+names(dados_tidades)
+
+#Rendimento
+dados_tidades <- dados_tidades %>%
+  mutate(rendimento = as.numeric(rendimento)) %>%
+  mutate(rendimento = na_if(rendimento, -88)) %>%
+  mutate(rendimento = na_if(rendimento, -77)) %>%
+  mutate(rendimento_cartao = as.numeric(rendimento_cartao)) %>%
+  mutate(rendimento_cartao = na_if(rendimento_cartao, 77)) %>%
+  mutate(rendimento_cartao = na_if(rendimento_cartao, 88))
+
+dados_rendimento <- dados_tidades %>%
+  select(rendimento, rendimento_cartao) %>%
+  remove_empty(which = "rows")
+sum(!is.na(dados_rendimento$rendimento_cartao)) # =104 ID que tem rendimento_cartao (e não rendimento)
+
+#Mismatches SEXO
+dados_tidades <- dados_tidades %>%
+  mutate(SEXO_a60 = as.integer(SEXO_a60)) %>%
+  mutate(SEXO_a60 = recode(SEXO_a60, "1" = "0", "2" = "1"))
+unique(dados_tidades$SEXO_a60)
+
+sum(dados_tidades$SEXO != dados_tidades$SEXO_a60, na.rm = TRUE)
+
+dados_tidades <- dados_tidades %>%
+  select(- SEXO_a60)
+unique(dados_tidades$SEXO)
+unique(dados_tidades$pratica_ef)
+
+#n complete cases pollution walkability = 2485
+sum(complete.cases(poll_walk))
+
+#n dados completos = 0
+sum(complete.cases(dados_tidades))
+
+#unir bases
+poll_walk$ID1 <- as.integer(poll_walk$ID1)
+poll_walk <- poll_walk %>%
+  mutate(ID=ID1)
+dados_unidos <- merge(dados_tidades, poll_walk, by="ID", all= FALSE) %>%
+  select(-ID1)%>%
+  mutate(
+    DIN1_DOM = na_if(DIN1_DOM, 777),
+    DIN2_DOM = na_if(DIN2_DOM, 777),
+    DIN3_DOM = na_if(DIN3_DOM, 777),
+    DIN1_NDOM = na_if(DIN1_NDOM, 777),
+    DIN2_NDOM = na_if(DIN2_NDOM, 777),
+    DIN3_NDOM = na_if(DIN3_NDOM, 777),
+    walk_temp_1 = ifelse(grepl("00:00:00", walk_temp_1) | walk_temp_1 == "", NA, walk_temp_1),
+    walk_temp_2 = ifelse(grepl("00:00:00", walk_temp_2) | walk_temp_2 == "", NA, walk_temp_2))
+
+#Ñ missings por variável
+colSums(is.na(dados_unidos))
+dados_unidos_n_missing <- dados_unidos %>%
+  summarise(across(everything(), ~ sum(!is.na(.)))) %>%
+  pivot_longer(cols = everything(), names_to = "Variável", values_to = "n") %>%
+  filter(n > 0)
+print(dados_unidos_n_missing, n=120)
+#write.csv(dados_unidos_n_missing, "dados_unidos_n_missing.csv", row.names = FALSE)
+  #MoCA_total_u60=268
+  #MMSE_total_a60=675
+  #DIN1_NDOM=845
+  #walk_comp_2=695
+
+#pratica_ef missings nas covariáveis = 0
+sum(!is.na(dados_unidos$pratica_ef))
+dados_ef <- dados_unidos %>%
+  select(lev_min, lev_dia.sem, mod_min, mod_dia.sem, vig_min, vig_dia.sem, outro_min, outro_dia.sem, outro_qual) %>%
+  remove_empty(which = "rows")
+nrow(dados_ef) #= 979
+
+#missings nos testes físicos = 0
+dados_tfisicos <- dados_unidos %>%
+  select(DIN1_DOM, DIN2_DOM, DIN3_DOM, DIN1_NDOM, DIN2_NDOM, DIN3_NDOM, walk_comp_1, walk_temp_1, walk_pq_1, walk_comp_2, walk_temp_2, walk_pq_2) %>%
+  remove_empty(which = "rows")
+nrow(dados_tfisicos) #= 880
+
+#Filtrar dados:
+#walk_comp_1 + DIN1_DOM
+dados_fisico <- filter(dados_unidos, !is.na(walk_comp_2), !is.na(DIN1_DOM))
+nrow(dados_fisico) #n=662
+
+#walk_comp_1 + DIN1_DOM + MoCA
+dados_fisicoMoCA <- filter(dados_unidos, !is.na(walk_comp_2), !is.na(DIN1_DOM), !is.na(MoCA_total_u60))
+nrow(dados_fisicoMoCA) #n=257
+
+#walk_comp_1 + DIN1_DOM + MMSE
+dados_fisicoMMSE <- filter(dados_unidos, !is.na(walk_comp_2), !is.na(DIN1_DOM), !is.na(MMSE_total_a60))
+nrow(dados_fisicoMMSE) #n=391
+
+#walk_comp_1 + DIN1_DOM + MMSE + ESCOL
+dados_fisicoMMSE_ESCOL <- filter(dados_unidos, !is.na(walk_comp_2), !is.na(DIN1_DOM), !is.na(MMSE_total_a60), !is.na(ESCOL))
+nrow(dados_fisicoMMSE_ESCOL) #n=354
+
+missing_dados_fisicoMMSE <- dados_fisicoMMSE %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(cols = everything(), names_to = "Variável", values_to = "Missing_n") %>%
+  filter(Missing_n > 0)
+print(missing_dados_fisicoMMSE, n=60)
+
+#walk_comp_1 + DIN1_DOM + (MMSE ou MoCA)
+dados_fisicomental <- filter(dados_unidos, !is.na(walk_comp_2), !is.na(DIN1_DOM), !is.na(MMSE_total_a60) | !is.na(MoCA_total_u60))
+nrow(dados_fisicomental) #n=648
+
+#missings nas restantes variáveis
+missing_dados_fisicomental <- dados_fisicomental %>%
+  summarise(across(everything(), ~ sum(is.na(.)))) %>%
+  pivot_longer(cols = everything(), names_to = "Variável", values_to = "Missing_n") %>%
+  filter(Missing_n > 0)
+print(missing_dados_fisicomental, n=60)
+
+#dados outcomes + co-variáveis
+dados_fisicomental_co <- dados_fisicomental %>%
+  filter(!is.na(pratica_ef), !is.na(ESCOL), !is.na(rendimento))
+nrow(dados_fisicomental_co) #n = 371
+colnames(dados_fisicomental_co)
+
+#walkability + DIN + walk.test + (MMSE ou MoCA)
+dados_exp_outc <- filter(dados_unidos, !is.na(walk_comp_1), !is.na(walk_comp_2), !is.na(DIN1_DOM), !is.na(DIN1_NDOM), !is.na(MMSE_total_a60) | !is.na(MoCA_total_u60)) %>%
+  mutate(idade_2017 = floor(as.numeric(difftime(as.Date("2017-12-31"), NASC, units = "days")) / 365.25))
+dados_exp_outc_n <- dados_exp_outc %>%
+  summarise(across(everything(), ~ sum(!is.na(.)))) %>%
+  pivot_longer(cols = everything(), names_to = "Variável", values_to = "n") %>%
+  filter(n > 0)
+print(dados_exp_outc_n, n=100)
+#write.csv(dados_exp_outc_n, "dados_exp_outc_n.csv", row.names = FALSE)
+
+#Remover ID com missing
+dados_completos <- dados_unidos %>%
+  select(ID, SEXO, NASC, ESCOL, pratica_ef, lev_min, lev_dia.sem, mod_min, mod_dia.sem, vig_min, vig_dia.sem, outro_min, outro_dia.sem, outro_qual, trabalho, rendimento, MMSE_total_a60, DIN1_DOM, DIN2_DOM, DIN3_DOM, DIN1_NDOM, DIN2_NDOM, DIN3_NDOM, walk_comp_1, walk_temp_1, walk_pq_1, walk_comp_2, walk_temp_2, walk_pq_2) %>%
+  filter(complete.cases(ID, SEXO, NASC, ESCOL, pratica_ef, trabalho, rendimento, MMSE_total_a60, DIN1_DOM, DIN2_DOM, DIN3_DOM, DIN1_NDOM, DIN2_NDOM, DIN3_NDOM, walk_comp_1, walk_temp_1, walk_comp_2, walk_temp_2))
+nrow(dados_completos) #n=211
+head(dados_completos)
+colnames(dados_completos)
+
+#####################
+#Estatística descritiva
+
+########CONTINUAR!!!!!!!!
+#Tabelas descritivas: preensão, caminhada, rendimento
+
+
+#Tabela frequência MMSE
+tabela_MMSE <- dados_exp_outc %>%
+  count(MMSE_total_a60) %>%
+  rename(MMSE_total = MMSE_total_a60) %>% 
+  mutate(Percentagem = paste0(round(n / sum(n)*100,2),"%"))
+print(tabela_MMSE)
+#write.csv(tabela_MMSE, "tabela_MMSE.csv", row.names = FALSE)
+
+#Tabela frequência MoCA
+tabela_MoCA <- dados_exp_outc %>%
+  count(MoCA_total_u60) %>%
+  rename(MoCA_total = MoCA_total_u60) %>% 
+  mutate(Percentagem = paste0(round(n / sum(n)*100,2),"%"))
+print(tabela_MoCA)
+#write.csv(tabela_MoCA, "tabela_MoCA.csv", row.names = FALSE)
+
+#Tabela resumo MMSE e MoCA
+tabela_MMSE_MoCA <- bind_rows(
+  dados_exp_outc %>%
+    summarise(
+    "Variável" = c("MMSE"),
+    "Mínimo" = min(MMSE_total_a60, na.rm = TRUE),
+    "Máximo" = max(MMSE_total_a60, na.rm = TRUE),
+    "Mediana" = median(MMSE_total_a60, na.rm=TRUE),
+    "IQR" = IQR(MMSE_total_a60, na.rm=TRUE),
+    "Média" = round(mean(MMSE_total_a60, na.rm = TRUE),2),
+    "Desvio-padrão" = round(sd(MMSE_total_a60, na.rm = TRUE),2)),
+  dados_exp_outc %>% summarise(
+    "Variável" = c("MoCA"),
+    "Mínimo" = min(MoCA_total_u60, na.rm = TRUE),
+    "Máximo" = max(MoCA_total_u60, na.rm = TRUE),
+    "Mediana" = median(MoCA_total_u60, na.rm=TRUE),
+    "IQR" = IQR(MoCA_total_u60, na.rm=TRUE),
+    "Média" = round(mean(MoCA_total_u60, na.rm = TRUE),2),
+    "Desvio-padrão" = round(sd(MoCA_total_u60, na.rm = TRUE),2)))
+#write.csv(tabela_MMSE_MoCA, "tabela_MMSE_MoCA.csv", row.names = FALSE)
+
+#Histograma MMSE
+ggplot(dados_exp_outc, aes(x = MMSE_total_a60)) +
+  geom_histogram(bins = 30, alpha = 0.6, fill="purple3", color="grey50") +
+  labs(title = "Distribuição de MMSE", x = "Pontuação total MMSE", y = "Frequência") +
+  theme_minimal()+
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 20, color = "grey40"),
+    axis.text.y = element_text(size = 20, color = "grey40"),
+    axis.text.x = element_text(size = 20, color = "grey40"),
+    axis.title.x = element_text(size = 15, color = "grey40"),
+    axis.title.y = element_text(size = 15, color = "grey40"),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank())
+
+#Histograma MoCA
+ggplot(dados_exp_outc, aes(x = MoCA_total_u60)) +
+  geom_histogram(bins = 30, alpha = 0.6, fill="orange2", color="grey50") +
+  labs(title = "Distribuição de MoCA", x = "Pontuação total MoCA", y = "Frequência") +
+  theme_minimal()+
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 20, color = "grey40"),
+    axis.text.y = element_text(size = 20, color = "grey40"),
+    axis.text.x = element_text(size = 20, color = "grey40"),
+    axis.title.x = element_text(size = 15, color = "grey40"),
+    axis.title.y = element_text(size = 15, color = "grey40"),
+    panel.grid.minor = element_blank(),
+    panel.grid.major = element_blank())
+
+#Gráfico dispersão idade*MMSE
+ggplot(dados_exp_outc, aes(x = idade_2017, y = MMSE_total_a60)) +
+  geom_point(color="green4") +
+  labs(title = "Gráfico de Dispersão MMSE", y = "MMSE_total", x = "Idade") +
+  scale_x_continuous(limits = c(59, NA))+
+  scale_y_continuous(limits = c(20, 30), breaks = seq(20, 30, 5),minor_breaks = seq(20,30,1))+
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 20, color = "grey40"),
+    axis.text.y = element_text(size = 20, color = "grey40"),
+    axis.text.x = element_text(size = 20, color = "grey40"),
+    axis.title.x = element_text(size = 15, color = "grey40"),
+    axis.title.y = element_text(size = 15, color = "grey40"),
+    panel.grid.major = element_line(colour = "grey"),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.minor.y = element_line(colour = "grey"))
+
+#Gráfico dispersão idade*MoCA
+ggplot(dados_exp_outc, aes(x = idade_2017, y = MoCA_total_u60)) +
+  geom_point(color="green4") +
+  labs(title = "Gráfico de Dispersão MoCA", y = "MoCA_total", x = "Idade") +
+  scale_x_continuous(limits = c(NA, 60)) +
+  scale_y_continuous(limits = c(20, 30), breaks = seq(20, 30, 5),minor_breaks = seq(20,30,1))+
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 20, color = "grey40"),
+    axis.text.y = element_text(size = 20, color = "grey40"),
+    axis.text.x = element_text(size = 20, color = "grey40"),
+    axis.title.x = element_text(size = 15, color = "grey40"),
+    axis.title.y = element_text(size = 15, color = "grey40"),
+    panel.grid.major = element_line(colour = "grey"),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.minor.y = element_line(colour = "grey"))
+
+#Tabela resumo Teste Preensão
+tabela_preensao <- bind_rows(
+  dados_exp_outc %>%
+    summarise(
+      "Variável" = c("DOM_1"),
+      "Mínimo" = min(DIN1_DOM, na.rm = TRUE),
+      "Máximo" = max(DIN1_DOM, na.rm = TRUE),
+      "Mediana" = median(DIN1_DOM, na.rm=TRUE),
+      "IQR" = IQR(DIN1_DOM, na.rm=TRUE),
+      "Média" = round(mean(DIN1_DOM, na.rm = TRUE),2),
+      "Desvio-padrão" = round(sd(DIN1_DOM, na.rm = TRUE),2)),
+  dados_exp_outc %>% summarise(
+    "Variável" = c("DOM_2"),
+    "Mínimo" = min(DIN2_DOM, na.rm = TRUE),
+    "Máximo" = max(DIN2_DOM, na.rm = TRUE),
+    "Mediana" = median(DIN2_DOM, na.rm=TRUE),
+    "IQR" = IQR(DIN2_DOM, na.rm=TRUE),
+    "Média" = round(mean(DIN2_DOM, na.rm = TRUE),2),
+    "Desvio-padrão" = round(sd(DIN2_DOM, na.rm = TRUE),2)),
+  dados_exp_outc %>% summarise(
+    "Variável" = c("DOM_3"),
+    "Mínimo" = min(DIN3_DOM, na.rm = TRUE),
+    "Máximo" = max(DIN3_DOM, na.rm = TRUE),
+    "Mediana" = median(DIN3_DOM, na.rm=TRUE),
+    "IQR" = IQR(DIN3_DOM, na.rm=TRUE),
+    "Média" = round(mean(DIN3_DOM, na.rm = TRUE),2),
+    "Desvio-padrão" = round(sd(DIN3_DOM, na.rm = TRUE),2)),
+  dados_exp_outc %>% summarise(
+    "Variável" = c("nDOM_1"),
+    "Mínimo" = min(DIN1_NDOM, na.rm = TRUE),
+    "Máximo" = max(DIN1_NDOM, na.rm = TRUE),
+    "Mediana" = median(DIN1_NDOM, na.rm=TRUE),
+    "IQR" = IQR(DIN1_NDOM, na.rm=TRUE),
+    "Média" = round(mean(DIN1_NDOM, na.rm = TRUE),2),
+    "Desvio-padrão" = round(sd(DIN1_NDOM, na.rm = TRUE),2)),
+  dados_exp_outc %>% summarise(
+    "Variável" = c("nDOM_2"),
+    "Mínimo" = min(DIN2_NDOM, na.rm = TRUE),
+    "Máximo" = max(DIN2_NDOM, na.rm = TRUE),
+    "Mediana" = median(DIN2_NDOM, na.rm=TRUE),
+    "IQR" = IQR(DIN2_NDOM, na.rm=TRUE),
+    "Média" = round(mean(DIN2_NDOM, na.rm = TRUE),2),
+    "Desvio-padrão" = round(sd(DIN2_NDOM, na.rm = TRUE),2)),
+  dados_exp_outc %>% summarise(
+    "Variável" = c("nDOM_3"),
+    "Mínimo" = min(DIN3_NDOM, na.rm = TRUE),
+    "Máximo" = max(DIN3_NDOM, na.rm = TRUE),
+    "Mediana" = median(DIN3_NDOM, na.rm=TRUE),
+    "IQR" = IQR(DIN3_NDOM, na.rm=TRUE),
+    "Média" = round(mean(DIN3_NDOM, na.rm = TRUE),2),
+    "Desvio-padrão" = round(sd(DIN3_NDOM, na.rm = TRUE),2)))
+#write.csv(tabela_preensao, "tabela_preensao.csv", row.names = FALSE)
+
+#dados_completos
+# Sexo
+tabela_sexo <- dados_completos %>%
+  mutate(SEXO = recode(SEXO, "0" = "Feminino", "1" = "Masculino")) %>%
+  count(SEXO) %>%
+  mutate(Percentagem = round(n / sum(n)*100,2))
+print(tabela_sexo)
+#write.csv(tabela_sexo, "tabela_sexo.csv", row.names = FALSE)
+#view(tabela_sexo)
+#edit(tabela_sexo)
+
+#Condição perante trabalho
+unique(dados_completos$trabalho)
+tabela_trabalho <- dados_completos %>%
+  mutate(trabalho = recode(trabalho," "="NA", "1"= "Exerce uma profissão a tempo inteiro", "2"= "Exerce uma profissão a tempo parcial", "3"= "Desempregado(a)", "4"= "Doméstica(o)", "5"= "Reformado(a)", "6"= "Invalidez", "77"= "Recusa", "88"= "Não sabe")) %>%
+  count(trabalho) %>%
+  mutate(Percentagem = n / sum(n)*100)
+print(tabela_trabalho)
+
+ggplot(tabela_trabalho, aes(x = reorder(trabalho, -Percentagem), y = Percentagem, fill = trabalho)) +
+  geom_bar(stat = "identity", width = 0.7) +  # Use identity to plot actual values
+  coord_flip() +  # Horizontal bars for better readability
+  labs(title = "Condição perante o trabalho",
+       x = "",
+       y = "") +
+  theme_minimal() +
+  theme(
+    legend.position = "none",  # Remove legend (colors unnecessary)
+    plot.title = element_text(hjust = 0.5, size = 20, color = "grey40"),  #Center title
+    axis.text.y = element_text(size = 20, color = "grey40"),  # label
+    panel.grid.major = element_blank(),  # Remove major grid lines
+    panel.grid.minor = element_blank(),   # Remove minor grid lines
+    axis.text.x = element_blank())+  # Remove the numbers from the x-axis
+  geom_text(aes(label = paste0(round(Percentagem, 1), "%")), hjust = -0.1, size = 6, color = "grey40")  # Add percentage labels
+  
+  
+#Idade_2017 (arrendondado para nº inteiro inferior)
+dados_completos <- dados_completos %>%
+  mutate(idade_2017 = floor(as.numeric(difftime(as.Date("2017-12-31"), NASC, units = "days")) / 365.25))
+
+tabela_idade <- dados_completos %>%
+  summarise(
+  "Variável" = c("Idade"),
+  "Mínimo" = min(idade_2017, na.rm=TRUE),
+  "Máximo" = max(idade_2017),
+  "Mediana" = median(idade_2017, na.rm=TRUE),
+  "IQR" = IQR(idade_2017, na.rm=TRUE),
+  "Média" = round(mean(idade_2017),2),
+  "Desvio-padrão" = round(sd(idade_2017),2))
+print(tabela_idade)
+
+ggplot(dados_completos, aes(y = idade_2017)) +
+  geom_boxplot() +
+  labs(title = "Boxplot of ESCOL", y = "idade_2017")
+
+#ESCOL
+tabela_ESCOL <- dados_completos %>%
+  summarise(
+  "Variável" = c("Escolaridade"),
+  "Mínimo" = min(ESCOL[ESCOL !=99], na.rm = TRUE),
+  "Máximo" = max(ESCOL[ESCOL !=99], na.rm = TRUE),
+  "Mediana" = median(ESCOL[ESCOL !=99], na.rm=TRUE),
+  "IQR" = IQR(ESCOL[ESCOL !=99], na.rm=TRUE),
+  "Média" = round(mean(ESCOL[ESCOL !=99], na.rm = TRUE),2),
+  "Desvio-padrão" = round(sd(ESCOL[ESCOL !=99], na.rm = TRUE),2))
+print(tabela_ESCOL)
+
+#Gráfico caixa e bigodes_ESCOL
+ggplot(dados_completos, aes(y = ESCOL)) +
+  geom_boxplot() +
+  labs(title = "Boxplot of ESCOL", y = "ESCOL")
+
+#Exercício físico
+unique(dados_completos$pratica_ef)
+
+dados_completos <- dados_completos %>%
+  mutate(vig_min=as.numeric(vig_min)) %>%
+  mutate(vig_min=na_if(vig_min,0)) %>%
+  mutate(mod_min=na_if(mod_min,0)) %>%
+  mutate(lev_min=na_if(lev_min,0)) %>%
+  filter(
+    pratica_ef == 0|
+    (complete.cases(lev_min, lev_dia.sem)) |
+    (complete.cases(mod_min, mod_dia.sem)) |
+    (complete.cases(vig_min, vig_dia.sem)) )
+
+tabela_pratica_ef <- dados_completos %>%
+  summarise(
+    pratica_ef_sim = sum(pratica_ef == 1),
+    pratica_ef_nao = sum(pratica_ef == 0),
+    lev_min_n = sum(!is.na(lev_min)),
+    lev_min_na = sum(is.na(lev_min)),
+    lev_dia_sem_n = sum(!is.na(lev_dia.sem)),
+    mod_min_n = sum(!is.na(mod_min)),
+    mod_min_na = sum(is.na(mod_min)),
+    mod_dia_sem_n = sum(!is.na(mod_dia.sem)),
+    vig_min_n = sum(!is.na(vig_min)),
+    vig_min_na = sum(is.na(vig_min)),
+    vig_dia_sem_n = sum(!is.na(vig_dia.sem))) %>%
+  pivot_longer(
+    cols = everything(),
+    names_to = "Variável",
+    values_to = "Contagem") %>%
+  mutate(
+    Tipo = case_when(
+      Variável %in% c("pratica_ef_sim", "pratica_ef_nao") ~ "n",
+      str_detect(Variável, "_n$") ~ "n",
+      str_detect(Variável, "_na$") ~ "NA",
+      TRUE ~ NA_character_),
+    Variável = case_when(
+      Variável %in% c("pratica_ef_sim", "pratica_ef_nao") ~ Variável,
+      TRUE ~ str_replace(Variável, "_n$|_na$", ""))) %>%
+  group_by(Variável) %>%
+  mutate(
+    Percentagem = round(Contagem / sum(Contagem) * 100, 2)) %>%
+  ungroup() %>%
+  mutate(
+    Variável = if_else(Tipo == "NA" & !Variável %in% c("pratica_ef_sim", "pratica_ef_nao"), paste0(Variável, "_na"), Variável)) %>%
+  select(Variável, Contagem, Percentagem)
+
+print(tabela_pratica_ef)
+
+#Intensidade pratica exercício físico
+dados_completos <- dados_completos %>%
+  mutate(lev_dia.sem = recode(lev_dia.sem, '1' = 7, '2' = 1)) %>%
+  mutate(mod_dia.sem = recode(mod_dia.sem, '1' = 7, '2' = 1)) %>%
+  mutate(vig_dia.sem = recode(vig_dia.sem, '1' = 7, '2' = 1))
+
+dados_completos <- dados_completos %>%
+  mutate(intensidade_n = 
+        if_else(!is.na(lev_min) & !is.na(lev_dia.sem), lev_min * lev_dia.sem * 0.5, 0) + 
+        if_else(!is.na(mod_min) & !is.na(mod_dia.sem), mod_min * mod_dia.sem, 0) + 
+        if_else(!is.na(vig_min) & !is.na(vig_dia.sem), vig_min * vig_dia.sem * 2, 0)) %>%
+  mutate(intensidade_q = case_when (
+    intensidade_n==0 ~ "Não pratica",
+    intensidade_n>=150 & intensidade_n <=300 ~ "Cumpre",
+    intensidade_n<150 ~ "Não cumpre",
+    intensidade_n>300 ~ "Excede",
+    TRUE ~ NA_character_
+    ))
+
+#Check se resultados diferentes variáveis correspondem
+#dados_completos_ef <- dados_completos %>%
+#  filter(pratica_ef==0)
+#unique(dados_completos_ef$intensidade_q)
+
+#dados_completos_np <- dados_completos %>%
+#  filter(intensidade_n==0)
+#unique(dados_completos_np$pratica_ef)
+
+tabela_intensidade_q <- dados_completos %>%
+  count(intensidade_q) %>%
+  mutate(percentagem = n / sum(n) * 100) %>%
+  arrange(n)
+print(tabela_intensidade_q)
+
+tabela_intensidade_n <- dados_completos %>%
+  summarise(
+  "Variável" = c("Intensidade EF"),
+  "Mínimo" = min(intensidade_n, na.rm = TRUE),
+  "Máximo" = max(intensidade_n, na.rm=TRUE),
+  "Mediana" = median(intensidade_n, na.rm=TRUE),
+  "IQR" = IQR(intensidade_n, na.rm=TRUE),
+  "Média" = round(mean(intensidade_n, na.rm=TRUE),2),
+  "Desvio-padrão" = round(sd(intensidade_n, na.rm=TRUE),2))
+print(tabela_intensidade_n)
+
+#Tabela resumo
+tabela_resumo <- bind_rows(
+  dados_completos %>%
+    summarise(
+      "Variável" = c("Idade"),
+      "n" = sum(!is.na(idade_2017)),
+      "Mínimo" = min(idade_2017, na.rm=TRUE),
+      "Máximo" = max(idade_2017),
+      "Mediana" = median(idade_2017, na.rm=TRUE),
+      "IQR" = IQR(idade_2017, na.rm=TRUE),
+      "Média" = round(mean(idade_2017),2),
+      "Desvio.Padrão" = round(sd(idade_2017),2)),
+  dados_completos %>%
+    summarise(
+      "Variável" = c("Escolaridade"),
+      "n" = sum(!is.na(ESCOL[ESCOL !=99])),
+      "Mínimo" = min(ESCOL[ESCOL !=99], na.rm = TRUE),
+      "Máximo" = max(ESCOL[ESCOL !=99], na.rm = TRUE),
+      "Mediana" = median(ESCOL[ESCOL !=99], na.rm=TRUE),
+      "IQR" = IQR(ESCOL[ESCOL !=99], na.rm=TRUE),
+      "Média" = round(mean(ESCOL[ESCOL !=99], na.rm = TRUE),2),
+      "Desvio.Padrão" = round(sd(ESCOL[ESCOL !=99], na.rm = TRUE),2)),
+  dados_completos %>%
+    summarise(
+      "Variável" = c("Intensidade EF"),
+      "n" = sum(!is.na(intensidade_n)),
+      "Mínimo" = min(intensidade_n, na.rm = TRUE),
+      "Máximo" = max(intensidade_n, na.rm=TRUE),
+      "Mediana" = median(intensidade_n, na.rm=TRUE),
+      "IQR" = IQR(intensidade_n, na.rm=TRUE),
+      "Média" = round(mean(intensidade_n, na.rm=TRUE),2),
+      "Desvio.Padrão" = round(sd(intensidade_n, na.rm=TRUE),2)))
+print(tabela_resumo)
+#write.csv(tabela_resumo, "tabela_resumo.csv", row.names = FALSE)
